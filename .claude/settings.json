@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(pnpm -v)",
+      "Bash(docker --version)",
+      "mcp__context7__resolve-library-id"
     ]
   },
   "enabledPlugins": {
