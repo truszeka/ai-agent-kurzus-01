@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime  = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id                Int      @id @default(autoincrement())
+  name              String
+  latin_name        String
+  category          String
+  location          String
+  price             Decimal  @db.Decimal(10, 0)
+  sale_price        Decimal? @db.Decimal(10, 0)
+  stock             Int
+  light             String
+  watering          String
+  difficulty        String
+  current_height_cm Int
+  max_height_cm     Int
+  current_pot_cm    Int
+  pet_safe          Boolean
+  kid_safe          Boolean
+  air_purifying     Boolean
+  rating            Decimal  @db.Decimal(2, 1)
+  reviews_count     Int
+  description       String
+
+  @@map("products")
+}

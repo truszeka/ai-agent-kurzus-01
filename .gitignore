@@ -1,3 +1,21 @@
 .env
 .env*
 .mcp.json
+
+
+
+.nx/cache
+.nx/workspace-data
+.nx/migrate-runs
+.nx/polygraph
+.claude/worktrees
+.claude/settings.local.json
+node_modules
+dist
+tmp
+coverage
+
+vitest.config.*.timestamp*
+
+# Prisma generált kliens (build artifact, nem forráskód)
+packages/db/src/generated
