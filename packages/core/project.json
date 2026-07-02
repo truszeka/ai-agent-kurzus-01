@@ -14,6 +14,7 @@
         "outputPath": "dist/packages/core",
         "main": "packages/core/src/index.ts",
         "tsConfig": "packages/core/tsconfig.lib.json",
+        "rootDir": "packages/core/src",
         "assets": []
       }
     }

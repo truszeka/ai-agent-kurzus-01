@@ -17,5 +17,11 @@ coverage
 
 vitest.config.*.timestamp*
 
+# Agent JSONL naplók (system prompt, üzenetek, token-használat)
+logs
+
 # Prisma generált kliens (build artifact, nem forráskód)
 packages/db/src/generated
+
+# Agent JSONL naplók (system prompt, üzenetek, token-használat)
+logs

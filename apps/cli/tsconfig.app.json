@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "types": ["node"]
+    "types": ["node"],
+    "composite": false
   },
   "include": ["src/**/*.ts"],
   "exclude": [
@@ -18,5 +19,10 @@
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx"
+  ],
+  "references": [
+    {
+      "path": "../../packages/core/tsconfig.lib.json"
+    }
   ]
 }
