@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "8bf292143ca93b00276a0de0fc5f84f2381f4690c5b0d32e99fa283a072f392f"
+    },
+    "sql-injection-testing": {
+      "source": "zebbern/claude-code-guide",
+      "sourceType": "github",
+      "skillPath": "skills/sql-injection-testing/SKILL.md",
+      "computedHash": "a090e513eb1429d4fa9f736888ddc96d43e70ef8c11e5d027076d9ca15cef23b"
+    }
+  }
+}
