@@ -13,23 +13,32 @@ try {
 
 const program = new Command();
 
-program.name('plantbase').description('Plantbase CLI').version('0.0.1');
+program
+  .name('plantbase')
+  .description('Plantbase CLI')
+  .version('0.0.1')
+  .option('--show-prompt', 'a system prompt megjelenítése a válasz előtt (FR5)');
+
+async function handleAsk(question: string): Promise<void> {
+  const { showPrompt } = program.opts<{ showPrompt?: boolean }>();
+  const { answer, systemPrompt } = await askAgent(question, { showPrompt });
+  if (showPrompt && systemPrompt) {
+    console.log('--- system prompt ---');
+    console.log(systemPrompt);
+    console.log('--- válasz ---');
+  }
+  console.log(answer);
+}
 
 program
   .command('ask')
   .argument('<text>', 'a kérdés szövege')
-  .description('elküldi a kérdést a Plantbase agentnek (DB-hozzáférés nélkül)')
-  .action(async (text: string) => {
-    const { answer } = await askAgent(text);
-    console.log(answer);
-  });
+  .description('elküldi a kérdést a Plantbase agentnek')
+  .action(handleAsk);
 
 program.action(async () => {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  await runInteractive(rl, async (line) => {
-    const { answer } = await askAgent(line);
-    console.log(answer);
-  });
+  await runInteractive(rl, handleAsk);
 });
 
 await program.parseAsync(process.argv);

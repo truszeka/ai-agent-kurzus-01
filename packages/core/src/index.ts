@@ -1,2 +1,2 @@
-export { askAgent } from './lib/ask-agent.js';
-export type { AskAgentResult } from './lib/ask-agent.js';
+export { askAgent } from './agent/ask-agent.js';
+export type { AskAgentOptions, AskAgentResult } from './agent/ask-agent.js';

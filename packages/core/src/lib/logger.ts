@@ -1,11 +1,19 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+export interface ToolCallLogEntry {
+  tool: string;
+  input: unknown;
+  result?: unknown;
+  error?: string;
+}
+
 export interface AskAgentLogEntry {
   timestamp: string;
   systemPrompt: string;
   question: string;
   answer: string;
+  toolCalls: ToolCallLogEntry[];
   usage: {
     inputTokens: number;
     outputTokens: number;
