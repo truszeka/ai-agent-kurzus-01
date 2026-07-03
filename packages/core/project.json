@@ -11,7 +11,7 @@
         "{options.outputPath}"
       ],
       "options": {
-        "outputPath": "dist/packages/core",
+        "outputPath": "packages/core/dist",
         "main": "packages/core/src/index.ts",
         "tsConfig": "packages/core/tsconfig.lib.json",
         "rootDir": "packages/core/src",

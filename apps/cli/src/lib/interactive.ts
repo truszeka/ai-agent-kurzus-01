@@ -7,16 +7,24 @@ export function runInteractive(
   onLine: (line: string) => void | Promise<void>,
 ): Promise<void> {
   return new Promise((resolve) => {
+    let closed = false;
     rl.on('line', (input) => {
       if (input.trim() === EXIT_COMMAND) {
         rl.close();
         return;
       }
       // A readline nem várja meg az async handlert, ezért szüneteltetjük a
-      // beolvasást, amíg a soros feldolgozás (pl. LLM-hívás) le nem fut.
+      // beolvasást, amíg a soros feldolgozás (pl. LLM-hívás) le nem fut. Ha a
+      // bemeneti stream eközben lezárul (pl. pipe-olt input végén), ne hívjunk
+      // resume()-ot egy már lezárt interface-en.
       rl.pause();
-      Promise.resolve(onLine(input)).finally(() => rl.resume());
+      Promise.resolve(onLine(input)).finally(() => {
+        if (!closed) rl.resume();
+      });
     });
-    rl.on('close', () => resolve());
+    rl.on('close', () => {
+      closed = true;
+      resolve();
+    });
   });
 }

@@ -85,4 +85,18 @@ describe('runInteractive', () => {
     await expect(done).resolves.toBeUndefined();
     expect(onLine).not.toHaveBeenCalled();
   });
+
+  it('should not throw if the stream closes while an async callback is still pending (piped EOF)', async () => {
+    const rl = createFakeReadline();
+    let resolveCallback: () => void = () => undefined;
+    const onLine = vi.fn(() => new Promise<void>((resolve) => (resolveCallback = resolve)));
+
+    const done = runInteractive(rl, onLine);
+    rl.emit('line', 'szia');
+    // A pipe-olt input végén a stream lezárulhat, mielőtt az async callback befejeződne.
+    (rl as unknown as { close: () => void }).close();
+    resolveCallback();
+
+    await expect(done).resolves.toBeUndefined();
+  });
 });
