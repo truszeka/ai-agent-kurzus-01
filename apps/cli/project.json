@@ -62,22 +62,13 @@
       "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
       "executor": "nx:noop"
     },
-    "serve": {
-      "continuous": true,
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
+    "start": {
+      "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "buildTarget": "cli:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "cli:build:development"
-        },
-        "production": {
-          "buildTarget": "cli:build:production"
-        }
+        "command": "node dist/apps/cli/main.js",
+        "cwd": "{workspaceRoot}",
+        "forwardAllArgs": true
       }
     }
   }

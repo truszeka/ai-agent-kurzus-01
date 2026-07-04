@@ -158,4 +158,36 @@ describe('askAgent', () => {
 
     expect(result.systemPrompt).toContain('Plantbase AI asszisztens');
   });
+
+  it('should prepend the given history to the messages sent to the model', async () => {
+    const create = vi.fn().mockResolvedValue(textResponse('Kaktusz volt az előbb is.'));
+    const client = { messages: { create } } as unknown as Anthropic;
+    const history: Anthropic.MessageParam[] = [
+      { role: 'user', content: 'milyen kaktuszaitok vannak?' },
+      { role: 'assistant', content: 'Van néhány opunciánk.' },
+    ];
+
+    await askAgent('és milyen színben?', { client, executors: {}, history });
+
+    const callArgs = create.mock.calls[0][0];
+    // A `messages` tömböt az askAgent a hívás UTÁN is mutálja (assistant válasszal),
+    // ezért csak a hívás pillanatában releváns, kezdeti szeletet ellenőrizzük.
+    expect(callArgs.messages.slice(0, history.length + 1)).toEqual([
+      ...history,
+      { role: 'user', content: 'és milyen színben?' },
+    ]);
+  });
+
+  it('should return the updated history including the new turn', async () => {
+    const client = {
+      messages: { create: vi.fn().mockResolvedValue(textResponse('Szia!')) },
+    } as unknown as Anthropic;
+
+    const result = await askAgent('szia', { client, executors: {} });
+
+    expect(result.history).toEqual([
+      { role: 'user', content: 'szia' },
+      { role: 'assistant', content: [{ type: 'text', text: 'Szia!' }] },
+    ]);
+  });
 });

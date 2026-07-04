@@ -57,6 +57,18 @@ describe('runInteractive', () => {
     expect(onLine).toHaveBeenCalledTimes(2);
   });
 
+  it('should also exit on "quit" or "kilép"', async () => {
+    const rl = createFakeReadline();
+    const onLine = vi.fn();
+
+    const done = runInteractive(rl, onLine);
+    rl.emit('line', 'szia');
+    rl.emit('line', 'kilép');
+    await done;
+
+    expect(onLine).toHaveBeenCalledTimes(1);
+  });
+
   it('should await an async callback before processing the next line', async () => {
     const rl = createFakeReadline();
     const order: string[] = [];

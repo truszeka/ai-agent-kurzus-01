@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { z } from 'zod';
+import { getReadOnlyPool } from '../lib/db-pool.js';
 import { appendJsonlLog, type ToolCallLogEntry } from '../lib/logger.js';
+import { traceLlmRequest, traceLlmResponse, traceToolEnd, traceToolError, traceToolStart } from '../lib/trace.js';
 import { AGENT_TOOLS } from './tool-definitions.js';
 import { createDefaultToolExecutors, type ToolExecutors } from './tool-executors.js';
 import { loadSystemPrompt } from './system-prompt.js';
@@ -19,11 +21,14 @@ export interface AskAgentOptions {
   pool?: Pool;
   executors?: ToolExecutors;
   showPrompt?: boolean;
+  quiet?: boolean;
+  history?: Anthropic.MessageParam[];
 }
 
 export interface AskAgentResult {
   answer: string;
   systemPrompt?: string;
+  history: Anthropic.MessageParam[];
 }
 
 function extractText(content: Anthropic.Messages.ContentBlock[]): string {
@@ -37,18 +42,22 @@ async function runTool(
   block: Anthropic.Messages.ToolUseBlock,
   executors: ToolExecutors,
   log: ToolCallLogEntry[],
+  quiet: boolean | undefined,
 ): Promise<Anthropic.Messages.ToolResultBlockParam> {
   const executor = executors[block.name];
+  traceToolStart(block.name, block.input, { quiet });
   try {
     if (!executor) {
       throw new Error(`Ismeretlen tool: ${block.name}`);
     }
     const result = await executor(block.input);
     log.push({ tool: block.name, input: block.input, result });
+    traceToolEnd(block.name, result, { quiet });
     return { type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.push({ tool: block.name, input: block.input, error: message });
+    traceToolError(block.name, message, { quiet });
     return {
       type: 'tool_result',
       tool_use_id: block.id,
@@ -66,53 +75,53 @@ export async function askAgent(
   const client = options.client ?? new Anthropic();
   const model = process.env['ANTHROPIC_MODEL'] ?? DEFAULT_MODEL;
   const systemPrompt = loadSystemPrompt();
+  const quiet = options.quiet;
 
-  // Csak akkor nyitunk Postgres-poolt, ha nincs se explicit pool, se teszt-executor.
-  let ownedPool: Pool | undefined;
-  let executors = options.executors;
-  if (!executors) {
-    const pool = options.pool ?? new Pool({ connectionString: process.env['DATABASE_URL_READONLY'] });
-    ownedPool = options.pool ? undefined : pool;
-    executors = createDefaultToolExecutors(pool);
-  }
+  // Csak akkor nyúlunk a Postgres-poolhoz, ha nincs teszt-executor; ilyenkor
+  // a modul-szintű singleton poolt használjuk (nem nyitunk/zárunk sajátot).
+  const executors = options.executors ?? createDefaultToolExecutors(options.pool ?? getReadOnlyPool());
 
   const toolCalls: ToolCallLogEntry[] = [];
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: input.question }];
+  const messages: Anthropic.MessageParam[] = [
+    ...(options.history ?? []),
+    { role: 'user', content: input.question },
+  ];
 
   let answer = '';
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
 
-  try {
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const response = await client.messages.create({
-        model,
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        tools: AGENT_TOOLS,
-        messages,
-      });
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    traceLlmRequest(turn, { quiet });
+    const response = await client.messages.create({
+      model,
+      max_tokens: MAX_TOKENS,
+      system: systemPrompt,
+      tools: AGENT_TOOLS,
+      messages,
+    });
 
-      totalInputTokens += response.usage.input_tokens;
-      totalOutputTokens += response.usage.output_tokens;
-      messages.push({ role: 'assistant', content: response.content });
+    totalInputTokens += response.usage.input_tokens;
+    totalOutputTokens += response.usage.output_tokens;
+    traceLlmResponse(
+      turn,
+      response.stop_reason,
+      { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      { quiet },
+    );
+    messages.push({ role: 'assistant', content: response.content });
 
-      if (response.stop_reason !== 'tool_use') {
-        answer = extractText(response.content);
-        break;
-      }
-
-      const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
-      for (const block of response.content) {
-        if (block.type !== 'tool_use') continue;
-        toolResults.push(await runTool(block, executors, toolCalls));
-      }
-      messages.push({ role: 'user', content: toolResults });
+    if (response.stop_reason !== 'tool_use') {
+      answer = extractText(response.content);
+      break;
     }
-  } finally {
-    if (ownedPool) {
-      await ownedPool.end();
+
+    const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
+    for (const block of response.content) {
+      if (block.type !== 'tool_use') continue;
+      toolResults.push(await runTool(block, executors, toolCalls, quiet));
     }
+    messages.push({ role: 'user', content: toolResults });
   }
 
   if (!answer) {
@@ -128,5 +137,5 @@ export async function askAgent(
     usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
   });
 
-  return options.showPrompt ? { answer, systemPrompt } : { answer };
+  return options.showPrompt ? { answer, systemPrompt, history: messages } : { answer, history: messages };
 }

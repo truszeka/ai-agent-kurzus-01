@@ -1,6 +1,6 @@
 import type { Interface } from 'node:readline';
 
-const EXIT_COMMAND = 'exit';
+const EXIT_COMMANDS = ['exit', 'quit', 'kilép'];
 
 export function runInteractive(
   rl: Interface,
@@ -9,7 +9,7 @@ export function runInteractive(
   return new Promise((resolve) => {
     let closed = false;
     rl.on('line', (input) => {
-      if (input.trim() === EXIT_COMMAND) {
+      if (EXIT_COMMANDS.includes(input.trim())) {
         rl.close();
         return;
       }
