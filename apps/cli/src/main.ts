@@ -1,84 +1,81 @@
-import { createInterface } from 'node:readline';
-import { askAgent, closeReadOnlyPool, getConfig, type AskAgentResult } from '@plantbase/core';
+import 'dotenv/config';
+import { join } from 'node:path';
 import { Command } from 'commander';
-import { runInteractive } from './lib/interactive.js';
+import {
+  askAgent,
+  loadConfig,
+  ConfigError,
+  closeReadOnlyPool,
+  setWatchLog,
+} from '@plantbase/core';
+import { runInteractive } from './interactive.js';
 
-// A CLI-t a repo gyökeréről futtatjuk (pnpm plantbase / node dist/apps/cli/main.js),
-// ezért a .env is ott van; hiánya nem hiba (pl. CI-ban vagy tesztben nincs .env).
-try {
-  process.loadEnvFile();
-} catch {
-  // nincs .env — a folyamat env-változóira hagyatkozunk
-}
-
-// Fail-fast config-validáció induláskor, mielőtt bármilyen parancs lefutna.
-try {
-  getConfig();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-}
+// plantbase ask "<kérdés>"   -> egyszeri válasz (élő színes trace + logs/<ts>.json)
+// plantbase ask              -> interaktív mód (beszélgetés-memóriával, exit-ig)
+// plantbase ask --quiet ...  -> nincs élő trace (csak a válasz), a JSON nyom akkor is elkészül
 
 const program = new Command();
 
+interface AskOptions {
+  quiet: boolean;
+}
+
 program
   .name('plantbase')
-  .description('Plantbase CLI')
-  .version('0.0.1')
-  .option('--show-prompt', 'a system prompt megjelenítése a válasz előtt (FR5)')
-  .option('--quiet', 'élő trace-kimenet elnyomása, csak a végső válasz jelenik meg');
-
-async function askOnce(question: string): Promise<void> {
-  const { showPrompt, quiet } = program.opts<{ showPrompt?: boolean; quiet?: boolean }>();
-  const { answer, systemPrompt } = await askAgent(question, { showPrompt, quiet });
-  if (showPrompt && systemPrompt) {
-    console.log('--- system prompt ---');
-    console.log(systemPrompt);
-    console.log('--- válasz ---');
-  }
-  console.log(answer);
-}
-
-async function runInteractiveSession(): Promise<void> {
-  const { showPrompt, quiet } = program.opts<{ showPrompt?: boolean; quiet?: boolean }>();
-  console.log('Plantbase AI asszisztens — kérdezz a növényekről! (kilépés: exit / quit / kilép)');
-
-  let history: AskAgentResult['history'] | undefined;
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-  process.stdout.write('> ');
-  await runInteractive(rl, async (line) => {
-    const result = await askAgent(line, { showPrompt, quiet, history });
-    history = result.history;
-    if (showPrompt && result.systemPrompt) {
-      console.log('--- system prompt ---');
-      console.log(result.systemPrompt);
-      console.log('--- válasz ---');
-    }
-    console.log(result.answer);
-    process.stdout.write('> ');
-  });
-}
+  .description(
+    'Plantbase — természetes nyelvű kérdés-válasz a növény-katalógus felett (CLI).',
+  )
+  .version('0.0.1');
 
 program
   .command('ask')
-  .argument('[text]', 'a kérdés szövege; ha elmarad, interaktív mód indul')
-  .description('elküldi a kérdést a Plantbase agentnek, szöveg nélkül interaktív módot indít')
-  .action(async (text?: string) => {
-    if (text) {
-      await askOnce(text);
-    } else {
-      await runInteractiveSession();
+  .description('Egyszeri kérdés, vagy argumentum nélkül interaktív mód.')
+  .argument('[kérdés...]', 'a feltett kérdés (idézőjelben vagy szavanként)')
+  .option(
+    '--quiet',
+    'ne írja ki az élő trace-t (a JSON nyom akkor is elkészül)',
+    false,
+  )
+  .action(async (words: string[], options: AskOptions) => {
+    // Fail-fast: a kulcs/konfiguráció hiányát azonnal, érthetően jelezzük.
+    try {
+      loadConfig();
+    } catch (error: unknown) {
+      if (error instanceof ConfigError) {
+        console.error(`plantbase: ${error.message}`);
+        process.exit(1);
+      }
+      throw error;
+    }
+
+    // A folyamatos "control room" log bekapcsolása: külön terminálban `tail -f logs/agent.log`.
+    setWatchLog(join(process.cwd(), 'logs', 'agent.log'));
+
+    const question = words.join(' ').trim();
+    try {
+      if (question === '') {
+        await runInteractive(options.quiet);
+      } else {
+        const result = await askAgent(question, { print: !options.quiet });
+        // Csendes módban a trace nem ír semmit → a választ itt írjuk ki.
+        if (options.quiet) {
+          console.log(result.answer);
+        }
+      }
+    } finally {
+      // A read-only pg-pool életben tartja az event loopot — zárjuk, hogy tisztán kilépjünk.
+      await closeReadOnlyPool();
     }
   });
 
-// Alparancs nélküli `plantbase` a súgót írja ki és kilép (base repo minta).
+// Parancs nélkül: súgó.
 if (process.argv.length <= 2) {
-  program.help();
+  program.outputHelp();
+  process.exit(0);
 }
 
-try {
-  await program.parseAsync(process.argv);
-} finally {
-  await closeReadOnlyPool();
-}
+program.parseAsync(process.argv).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`plantbase hiba: ${message}`);
+  process.exit(1);
+});

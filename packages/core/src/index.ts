@@ -1,4 +1,6 @@
-export { askAgent } from './agent/ask-agent.js';
-export type { AskAgentOptions, AskAgentResult } from './agent/ask-agent.js';
-export { getConfig } from './config.js';
-export { closeReadOnlyPool } from './lib/db-pool.js';
+export * from './lib/echo.js';
+export * from './lib/config.js';
+export * from './lib/prompts.js';
+export * from './lib/tools/index.js';
+export * from './lib/trace.js';
+export * from './lib/agent.js';

@@ -1,31 +1,18 @@
--- Plantbase — read-only DB-szerepkör (NFR1, architektura.md 2. pont).
--- A Prisma a `plantbase` (RW) userrel viszi a sémát/migrációt/seedet.
--- Az agent runSql toolja EZT a szerepkört használja, csak SELECT-tel.
--- A .env DATABASE_URL_READONLY hitelesítő adataival egyezik.
+-- Plantbase — READ-ONLY szerepkör az agent runSql-jéhez (NFR1).
+-- A docker-entrypoint ezt a POSTGRES_USER (plantbase) néven, a POSTGRES_DB-n futtatja,
+-- a Postgres első indulásakor (üres adatkönyvtár). A products tábla ekkor még NEM létezik,
+-- azt a Prisma migráció hozza létre később — ezért az ALTER DEFAULT PRIVILEGES a kulcs.
 
 CREATE ROLE plantbase_ro WITH LOGIN PASSWORD 'plantbase_ro';
 
+-- Csatlakozás + olvasás a public sémában.
 GRANT CONNECT ON DATABASE plantbase TO plantbase_ro;
 GRANT USAGE ON SCHEMA public TO plantbase_ro;
 
--- A products tábla a migráció során, a `plantbase` (RW) userrel jön létre,
--- ezért itt még nem létezik: a jövőbeli táblákra öröklődő alapértelmezett
--- jogosultsággal adjuk meg előre a csak-SELECT hozzáférést.
+-- A már létező táblákra (induláskor nincs még) SELECT.
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO plantbase_ro;
+
+-- A jövőben a plantbase (RW) által létrehozott táblákra (Prisma migráció) automatikus SELECT,
+-- de SEMMI más (nincs INSERT/UPDATE/DELETE/DDL) — így a kapcsolat valóban csak olvas.
 ALTER DEFAULT PRIVILEGES FOR ROLE plantbase IN SCHEMA public
   GRANT SELECT ON TABLES TO plantbase_ro;
-
--- Ha a migráció már lefutott (pl. újraindításkor), a meglévő táblákra is:
-DO $$
-BEGIN
-  EXECUTE (
-    SELECT COALESCE(
-      string_agg(
-        format('GRANT SELECT ON TABLE %I TO plantbase_ro;', tablename),
-        ' '
-      ),
-      ''
-    )
-    FROM pg_tables
-    WHERE schemaname = 'public'
-  );
-END $$;
