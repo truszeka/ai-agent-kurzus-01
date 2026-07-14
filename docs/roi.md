@@ -41,22 +41,31 @@ business case nem múlik a becslés pontosságán.
 A fenti megtakarítás bruttó szám: nem tartalmazza az agent üzemeltetésének
 (LLM API-hívások) költségét. Ezt is le kell vonni, hogy nettó képet kapjunk.
 
+Feltételezések (forrás: [Anthropic hivatalos API árazás](https://platform.claude.com/docs/en/about-claude/pricing),
+2026; árfolyam: ~312 Ft/USD, 2026. július):
+
 | Tétel | Érték |
 |---|---|
-| Becsült token/kérdés (input + output) | ≈ 2 500 |
-| Becsült API-költség / kérdés | ≈ 5 Ft |
+| Használt modell (`.env`: `ANTHROPIC_MODEL`) | Claude Sonnet 4.6 |
+| Modell árazása | $3 / MTok input, $15 / MTok output |
+| Becsült token/kérdés (input + output, tool use-szal) | ≈ 3 000 + 400 |
+| Becsült API-költség / kérdés | (3000×$3 + 400×$15) / 1e6 ≈ $0,015 ≈ **4,7 Ft** |
 | Kérdés / hónap (alap eset, 4,33 hét) | ≈ 65 |
-| **Agent költség / hónap** | **≈ 350 Ft** |
+| **Agent költség / hónap** | **≈ 305 Ft** |
 
-| Forgatókönyv | Havi megtakarítás (bruttó) | Havi agent költség | **Havi nettó megtakarítás** |
+Költségérzékeny demóhoz a kód alapértelmezése (`DEFAULT_MODEL` a
+`ask-agent.ts`-ben) a Claude Haiku 4.5 ($1 / $5 per MTok) — ezzel a fenti
+költség kb. harmadára, havi **≈ 100 Ft**-ra csökkenne.
+
+| Forgatókönyv | Havi megtakarítás (bruttó) | Havi agent költség (Sonnet 4.6) | **Havi nettó megtakarítás** |
 |---|---|---|---|
-| Pesszimista | 52 000 Ft | ≈ 190 Ft | **≈ 51 800 Ft** |
-| Alap | 146 000 Ft | ≈ 350 Ft | **≈ 145 650 Ft** |
-| Optimista | 325 000 Ft | ≈ 585 Ft | **≈ 324 400 Ft** |
+| Pesszimista | 52 000 Ft | ≈ 165 Ft | **≈ 51 835 Ft** |
+| Alap | 146 000 Ft | ≈ 305 Ft | **≈ 145 695 Ft** |
+| Optimista | 325 000 Ft | ≈ 508 Ft | **≈ 324 492 Ft** |
 
 Az agent futtatási költsége minden forgatókönyvben elhanyagolható a
-megspórolt elemzői időhöz képest (< 0,5%), a nettó megtakarítás gyakorlatilag
-megegyezik a bruttóval.
+megspórolt elemzői időhöz képest (< 0,4%), a nettó megtakarítás gyakorlatilag
+megegyezik a bruttóval — még a drágább Sonnet modellel számolva is.
 
 ## Soft ROI
 
